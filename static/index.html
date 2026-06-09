@@ -129,7 +129,7 @@ function render(d){
     return;
   }
   let html = `<table><thead><tr>
-    <th>Stock</th><th class="num">Window ₹</th><th class="num">Win %</th>
+    <th>Stock</th><th class="num">Last</th><th class="num">Chg %</th><th class="num">Window ₹</th><th class="num">Win %</th>
     <th>Signal</th><th>Sources</th><th>Groww</th><th>Yahoo</th><th>News</th><th>Catalyst (BSE)</th><th></th>
   </tr></thead><tbody>`;
   for(const s of rows){
@@ -137,6 +137,8 @@ function render(d){
     const wm = s.win_move;
     html += `<tr>
       <td><div class="name">${s.name}</div><div class="sym">${s.symbol}</div></td>
+      <td class="num">${fmt(s.last_price)}</td>
+      <td class="num ${s.change_pct>0?'up':s.change_pct<0?'down':''}">${s.change_pct==null?'—':fmt(s.change_pct)+'%'}</td>
       <td class="num">${cr(s.turnover)}</td>
       <td class="num ${wm>0?"up":wm<0?"down":""}">${wm==null?"—":fmt(wm)+"%"}</td>
       <td><span class="sig ${sig.side}">${sig.action}</span>

@@ -25,7 +25,10 @@ import outcomes
 import datetime as dt
 
 app = FastAPI(title="Window Signals")
-store.init()
+try:
+    store.init()
+except Exception as e:
+    print(f"[store] init skipped: {e}")
 
 _token = os.environ.get("GROWW_ACCESS_TOKEN")   # optional boot value
 _cache = {"data": None, "ts": 0}

@@ -179,6 +179,28 @@ def yahoo_closes(ysym):
         return []
 
 
+def yahoo_quote(ysym):
+    """Returns (closes, last_price, change_pct) — all REAL data from Yahoo
+    (last price + % change vs previous close). Not a prediction."""
+    if not ysym:
+        return [], None, None
+    try:
+        r = httpx.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{ysym}",
+                      params={"range": "6mo", "interval": "1d"},
+                      headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        r.raise_for_status()
+        res = r.json()["chart"]["result"][0]
+        meta = res.get("meta", {}) or {}
+        q = res["indicators"]["quote"][0]
+        closes = [x for x in (q.get("close") or []) if x is not None]
+        last = meta.get("regularMarketPrice") or (closes[-1] if closes else None)
+        prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+        chg = ((last - prev) / prev * 100) if (last and prev) else None
+        return closes, last, chg
+    except Exception:
+        return [], None, None
+
+
 # ---- RSS news -------------------------------------------------------------
 def load_news():
     items = []
@@ -256,7 +278,7 @@ def analyze(get_groww):
         sym, name = u["symbol"], u["name"]
         ysym = (sym + ".NS") if sym else None
         g_closes = [c[4] for c in groww_candles(groww, sym, hist_s, hist_e, DAILY_INTERVAL_MIN)] if (groww and sym) else []
-        y_closes = yahoo_closes(ysym)
+        y_closes, y_last, y_chg = yahoo_quote(ysym)
         g_lean, g_note = trend_lean(g_closes)
         y_lean, y_note = trend_lean(y_closes)
         n_lean, n_hits = news_lean(name, news)
@@ -275,8 +297,11 @@ def analyze(get_groww):
         results.append({
             "symbol": sym or u["slug"], "name": name,
             "turnover": u["turnover"] or 0, "win_move": u["win_move"],
+            "last_price": y_last if y_last else (g_closes[-1] if g_closes else None),
+            "change_pct": y_chg,
             "groww": {"last": g_closes[-1] if g_closes else None, "note": g_note, "lean": g_lean},
-            "yahoo": {"last": y_closes[-1] if y_closes else None, "note": y_note, "lean": y_lean},
+            "yahoo": {"last": y_last if y_last else (y_closes[-1] if y_closes else None),
+                      "note": y_note, "lean": y_lean},
             "news": {"hits": n_hits, "lean": n_lean},
             "window_lean": w_lean, "price_flag": price_flag, "signal": signal,
             "catalyst": anns.get(sym) if sym else None,
