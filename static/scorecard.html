@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scorecard · Window Signals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0c0f;--panel:#11151a;--line:#1e252d;--ink:#e7edf3;--dim:#8b97a4;
+    --bull:#46d39a;--bear:#ff6b6b;--warn:#ffc14d;--flat:#5b6672;--accent:#7fd1ff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"JetBrains Mono",monospace;font-size:13px}
+  header{display:flex;align-items:center;justify-content:space-between;
+    padding:18px 24px;border-bottom:1px solid var(--line)}
+  h1{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:22px;margin:0}
+  a{color:var(--accent);text-decoration:none}
+  .disclaimer{background:#1a1408;border:1px solid #3a2e0e;color:#f0d79a;
+    padding:9px 24px;font-size:11px}
+  main{padding:20px 24px;max-width:1100px;margin:0 auto}
+  .cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;min-width:150px}
+  .card h3{margin:0 0 10px;font-size:10px;letter-spacing:.6px;text-transform:uppercase;
+    color:var(--dim);font-weight:500}
+  .big{font-family:"Bricolage Grotesque",sans-serif;font-size:30px;font-weight:700}
+  .sub{color:var(--dim);font-size:11px;margin-top:4px}
+  table{width:100%;border-collapse:collapse;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:22px}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);font-weight:500}
+  .good{color:var(--bull)} .bad{color:var(--bear)} .mut{color:var(--dim)}
+  .empty{padding:40px;text-align:center;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Scorecard</h1>
+  <a href="/">← back to signals</a>
+</header>
+<div class="disclaimer">
+  Hit-rate = how often a graded signal's <b>market-relative</b> move matched its
+  direction (net of NIFTY, &gt;0.3%). Neutral/conflict signals aren't graded. A
+  few weeks is far too little to trust — look for whether <b>medium</b> beats
+  <b>low</b> and beats 50% over <b>months</b> before believing the confluence works.
+</div>
+<main>
+  <div class="cards" id="cards"><div class="empty">Loading…</div></div>
+  <h3 style="color:var(--dim);font-size:11px;letter-spacing:.6px">PER-SOURCE RELIABILITY (when it leaned, did the day go its way?)</h3>
+  <div id="sources"></div>
+  <h3 style="color:var(--dim);font-size:11px;letter-spacing:.6px">RECENT GRADED SIGNALS</h3>
+  <div id="recent"></div>
+</main>
+<script>
+const pct = v => v==null ? "—" : v+"%";
+const cls = v => v==null ? "mut" : (v>=50 ? "good" : "bad");
+
+async function load(){
+  const d = await (await fetch("/api/scorecard")).json();
+  const o = d.overall;
+  document.getElementById("cards").innerHTML = `
+    <div class="card"><h3>Overall</h3><div class="big ${cls(o.rate)}">${pct(o.rate)}</div>
+      <div class="sub">${o.hits}/${o.n} graded</div></div>
+    <div class="card"><h3>Low conf</h3><div class="big ${cls(d.by_confidence.low.rate)}">${pct(d.by_confidence.low.rate)}</div>
+      <div class="sub">${d.by_confidence.low.n} signals</div></div>
+    <div class="card"><h3>Medium conf</h3><div class="big ${cls(d.by_confidence.medium.rate)}">${pct(d.by_confidence.medium.rate)}</div>
+      <div class="sub">${d.by_confidence.medium.n} signals</div></div>
+    <div class="card"><h3>Bull calls</h3><div class="big ${cls(d.by_side.bull.rate)}">${pct(d.by_side.bull.rate)}</div>
+      <div class="sub">${d.by_side.bull.n} signals</div></div>
+    <div class="card"><h3>Bear calls</h3><div class="big ${cls(d.by_side.bear.rate)}">${pct(d.by_side.bear.rate)}</div>
+      <div class="sub">${d.by_side.bear.n} signals</div></div>`;
+
+  let s = `<table><thead><tr><th>Source</th><th>Right when it leaned</th><th>Sample</th></tr></thead><tbody>`;
+  for(const k of Object.keys(d.per_source)){
+    const v = d.per_source[k];
+    s += `<tr><td>${k}</td><td class="${cls(v.rate)}">${pct(v.rate)}</td><td class="mut">${v.n}</td></tr>`;
+  }
+  s += `</tbody></table>`;
+  document.getElementById("sources").innerHTML = s;
+
+  if(!d.recent.length){
+    document.getElementById("recent").innerHTML = `<div class="empty">No graded signals yet. They appear after /api/log-outcomes runs at end of day.</div>`;
+    return;
+  }
+  let r = `<table><thead><tr><th>Date</th><th>Stock</th><th>Signal</th><th>Conf</th>
+    <th>Stock ret</th><th>Mkt ret</th><th>Result</th></tr></thead><tbody>`;
+  for(const x of d.recent){
+    const ret = x.outcome_ret==null?"—":(x.outcome_ret*100).toFixed(2)+"%";
+    const mkt = x.mkt_ret==null?"—":(x.mkt_ret*100).toFixed(2)+"%";
+    r += `<tr><td class="mut">${x.date}</td><td>${x.name}</td>
+      <td>${x.side}</td><td class="mut">${x.confidence}</td>
+      <td>${ret}</td><td class="mut">${mkt}</td>
+      <td class="${x.correct?'good':'bad'}">${x.correct?'hit':'miss'}</td></tr>`;
+  }
+  r += `</tbody></table>`;
+  document.getElementById("recent").innerHTML = r;
+}
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Window Signals · 9:15–9:25</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c0f; --panel:#11151a; --line:#1e252d; --ink:#e7edf3;
+    --dim:#8b97a4; --bull:#46d39a; --bear:#ff6b6b; --warn:#ffc14d; --flat:#5b6672;
+    --accent:#7fd1ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(1200px 600px at 80% -10%, #14202b 0%, transparent 60%),
+      var(--bg);
+    color:var(--ink);font-family:"JetBrains Mono",monospace;font-size:13px;}
+  header{display:flex;align-items:center;justify-content:space-between;
+    gap:16px;padding:18px 24px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  h1{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;
+    font-size:22px;margin:0;letter-spacing:-.5px}
+  h1 span{color:var(--accent)}
+  .meta{color:var(--dim);font-size:11px;line-height:1.7;text-align:right}
+  .disclaimer{background:#1a1408;border:1px solid #3a2e0e;color:#f0d79a;
+    padding:9px 24px;font-size:11px}
+  main{padding:20px 24px;max-width:1200px;margin:0 auto}
+  .bar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  button{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+    padding:8px 14px;border-radius:8px;font-family:inherit;font-size:12px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  input{background:#0d1116;border:1px solid var(--line);color:var(--ink);
+    padding:8px 10px;border-radius:8px;font-family:inherit;font-size:12px;min-width:280px}
+  .pill{padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.5px}
+  .ok{background:#0f2a1f;color:var(--bull)} .no{background:#2a1212;color:var(--bear)}
+  table{width:100%;border-collapse:collapse;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--line);
+    white-space:nowrap}
+  th{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);
+    font-weight:500}
+  tbody tr:hover{background:#141a21}
+  .name{font-family:"Bricolage Grotesque",sans-serif;font-weight:500;font-size:14px}
+  .sym{color:var(--dim);font-size:11px}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .sig{font-weight:700;padding:5px 10px;border-radius:8px;display:inline-block}
+  .sig.bull{background:#0f2a1f;color:var(--bull)}
+  .sig.bear{background:#2a1212;color:var(--bear)}
+  .sig.conflict{background:#2a230c;color:var(--warn)}
+  .sig.neutral{background:#1a1f25;color:var(--flat)}
+  .conf{font-size:10px;color:var(--dim);margin-top:3px}
+  .dots{display:flex;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--flat)}
+  .dot.b{background:var(--bull)} .dot.s{background:var(--bear)}
+  .dot[title]{cursor:help}
+  .flag{color:var(--warn);font-size:10px}
+  .up{color:var(--bull)} .down{color:var(--bear)}
+  .empty{padding:40px;text-align:center;color:var(--dim)}
+  footer{padding:16px 24px;color:var(--dim);font-size:10px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Window<span>Signals</span> · 9:15–9:25 IST</h1>
+    <div class="sym">cross-source confluence · Groww · Crawl4AI · RSS · Yahoo</div>
+  </div>
+  <div class="meta" id="meta">loading…</div>
+</header>
+
+<div class="disclaimer">
+  Signals are a cross-source <b>indicator read</b> — they reflect whether sources
+  agree, not where price will go. This is <b>not a prediction and not financial
+  advice</b>. Opening-window data is noisy; verify before acting and size for being wrong.
+</div>
+
+<main>
+  <div class="bar">
+    <button onclick="load(true)">↻ Refresh now</button>
+    <a href="/scorecard" style="text-decoration:none"><button>📊 Scorecard</button></a>
+    <span id="tokstatus" class="pill no">token: unknown</span>
+    <input id="tok" type="password" placeholder="Paste morning Groww access token">
+    <input id="sec" type="password" placeholder="Dashboard secret (if set)" style="min-width:200px">
+    <button onclick="setToken()">Set token</button>
+  </div>
+  <div id="content"><div class="empty">Fetching…</div></div>
+</main>
+
+<footer>Auto-refreshes every 60s. Token is held in server memory only and clears on restart — re-paste each morning.</footer>
+
+<script>
+const fmt = (v,d=2)=> v==null? "—" : Number(v).toLocaleString("en-IN",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cr = v=> v==null? "—" : "₹"+Number(v).toLocaleString("en-IN",{maximumFractionDigits:0});
+
+function leanDot(v,label){
+  const cls = v>0?"b":v<0?"s":"";
+  const t = label+": "+(v>0?"bull":v<0?"bear":"flat");
+  return `<span class="dot ${cls}" title="${t}"></span>`;
+}
+
+async function load(force){
+  try{
+    const r = await fetch("/api/data"+(force?"?force=1":""));
+    const d = await r.json();
+    render(d);
+  }catch(e){
+    document.getElementById("content").innerHTML =
+      `<div class="empty">Failed to load: ${e}</div>`;
+  }
+}
+
+function render(d){
+  const meta = document.getElementById("meta");
+  if(d.error){ meta.textContent = "error: "+d.error; }
+  else {
+    meta.innerHTML = `updated ${d.updated}<br>window ${d.window} · `+
+      `scrape ${d.scrape_enabled?"on":"off"} · groww ${d.groww_connected?"live":"—"}`;
+  }
+  const ts = document.getElementById("tokstatus");
+  ts.className = "pill "+(d.groww_connected?"ok":"no");
+  ts.textContent = "token: "+(d.groww_connected?"active":"not set");
+
+  const rows = (d.stocks||[]);
+  if(!rows.length){
+    document.getElementById("content").innerHTML =
+      `<div class="empty">No data yet. ${d.groww_connected?"":"Set the Groww token, then refresh."}</div>`;
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>Stock</th><th class="num">Window ₹</th><th class="num">Win %</th>
+    <th>Signal</th><th>Sources</th><th>Groww</th><th>Yahoo</th><th>News</th><th>Catalyst (BSE)</th><th></th>
+  </tr></thead><tbody>`;
+  for(const s of rows){
+    const sig = s.signal;
+    const wm = s.win_move;
+    html += `<tr>
+      <td><div class="name">${s.name}</div><div class="sym">${s.symbol}</div></td>
+      <td class="num">${cr(s.turnover)}</td>
+      <td class="num ${wm>0?"up":wm<0?"down":""}">${wm==null?"—":fmt(wm)+"%"}</td>
+      <td><span class="sig ${sig.side}">${sig.action}</span>
+          <div class="conf">conf: ${sig.confidence}</div></td>
+      <td><div class="dots">
+            ${leanDot(s.groww.lean,"Groww")}${leanDot(s.yahoo.lean,"Yahoo")}
+            ${leanDot(s.news.lean,"News")}${leanDot(s.window_lean,"Window")}
+          </div><div class="conf">${sig.detail}</div></td>
+      <td>${fmt(s.groww.last)}<div class="conf">${s.groww.note}</div></td>
+      <td>${fmt(s.yahoo.last)}<div class="conf">${s.yahoo.note}</div></td>
+      <td>${s.news.hits} hit(s)</td>
+      <td>${s.catalyst?`<span class="${s.catalyst.recent?'up':''}">${s.catalyst.recent?'📄 ':''}${s.catalyst.headline||'filing'}</span><div class="conf">${s.catalyst.when||''}</div>`:'<span class="conf">—</span>'}</td>
+      <td>${s.price_flag?`<span class="flag">⚠ ${s.price_flag}</span>`:""}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+  document.getElementById("content").innerHTML = html;
+}
+
+async function setToken(){
+  const token = document.getElementById("tok").value;
+  const secret = document.getElementById("sec").value;
+  if(!token){ alert("Paste the access token first"); return; }
+  const r = await fetch("/api/token",{method:"POST",
+    headers:{"Content-Type":"application/json","X-Secret":secret},
+    body:JSON.stringify({token})});
+  if(r.ok){ document.getElementById("tok").value=""; load(true); }
+  else { alert("Failed: "+(await r.text())); }
+}
+
+load(false);
+setInterval(()=>load(false), 60000);
+</script>
+</body>
+</html>
